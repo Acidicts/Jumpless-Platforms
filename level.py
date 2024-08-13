@@ -1,12 +1,12 @@
 import pygame.sprite
 
 from settings import *
-from sprites import Sprite
+from sprites import Sprite, Platform
 from pytmx.util_pygame import load_pygame
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, groups, collider_sprites):
+    def __init__(self, pos, groups, collider_sprites, platforms):
         # noinspection PyTypeChecker
         super().__init__(groups)
 
@@ -21,7 +21,10 @@ class Player(pygame.sprite.Sprite):
         self.speed = 100
         self.gravity = 5
 
-        self.sprite_collider = [sprites.rect for sprites in collider_sprites]
+        self.collide_sprites = collider_sprites
+        self.sprite_collider = [sprites.rect for sprites in self.collide_sprites]
+
+        self.platforms = platforms
 
         self.colliders = {
             'top': False,
@@ -51,25 +54,28 @@ class Player(pygame.sprite.Sprite):
 
     def collisions(self, direction):
         if direction == 'x':
-            for sprite in self.sprite_collider:
-                if self.hitbox.colliderect(sprite):
+            for sprite in self.collide_sprites:
+                if self.hitbox.colliderect(sprite.rect) and sprite not in self.platforms:
 
-                    if self.hitbox.right > sprite.left:
-                        self.hitbox.right = sprite.left
+                    if self.hitbox.right > sprite.rect.left:
+                        self.hitbox.right = sprite.rect.left
 
-                    elif self.hitbox.left < sprite.right:
-                        self.hitbox.left = sprite.right
+                    elif self.hitbox.left < sprite.rect.right:
+                        self.hitbox.left = sprite.rect.right
 
         elif direction == 'y':
-            for sprite in self.sprite_collider:
-                if self.hitbox.colliderect(sprite):
+            for sprite in self.collide_sprites:
+                if self.hitbox.colliderect(sprite.rect):
 
-                    if self.rect.bottom > sprite.top:
-                        self.hitbox.bottom = sprite.top
+                    if not sprite in self.platforms:
+                        if self.rect.bottom > sprite.rect.top:
+                            self.hitbox.bottom = sprite.rect.top
 
-                    elif self.rect.top > sprite.bottom:
-                        self.hitbox.top = sprite.bottom
-                        self.direction.y = 0
+                        elif self.rect.top > sprite.rect.bottom:
+                            self.hitbox.top = sprite.rect.bottom
+                            self.direction.y = 0
+                    else:
+                        self.direction.y -= 5
 
     def input(self):
         keys = pygame.key.get_pressed()
@@ -86,6 +92,8 @@ class Player(pygame.sprite.Sprite):
         self.hitbox.center = pos
 
     def update(self, dt):
+        self.sprite_collider = [sprites.rect for sprites in self.collide_sprites]
+
         self.collide()
         self.input()
 
@@ -105,21 +113,29 @@ class Level:
 
         self.all_sprites = AllSprites()
         self.colliders_sprites = pygame.sprite.Group()
+        self.platforms_sprites = pygame.sprite.Group()
+
         self.player = None
 
         self.setup()
 
         self.map = 'map/0.tmx'
 
+    # noinspection PyTypeChecker
     def setup(self):
         tmx_data = load_pygame('map/0.tmx')  # Corrected this line
 
         for x, y, surf in tmx_data.get_layer_by_name('Colliders').tiles():
             Sprite((x * TILESIZE, y * TILESIZE), surf, (self.all_sprites, self.colliders_sprites))
 
+        for obj in tmx_data.get_layer_by_name('Platforms'):
+            Platform((obj.x + TILESIZE // 2, obj.y), pygame.image.load('map/platform.png'),
+                     (self.all_sprites, self.platforms_sprites, self.colliders_sprites),
+                     Vector2(obj.properties['Right'], obj.properties['Up']), 50)
+
         for obj in tmx_data.get_layer_by_name('Objects'):
             if obj.name == 'player':
-                self.player = Player((obj.x, obj.y), self.all_sprites, self.colliders_sprites)
+                self.player = Player((obj.x, obj.y), self.all_sprites, self.colliders_sprites, self.platforms_sprites)
 
     def run(self, dt):
 
