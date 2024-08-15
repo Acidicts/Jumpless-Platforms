@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pygame-ce"
+name = "platformer"
 version = "2.5.1"
 description = "pygame"
 authors = ["Acidicts <111660544+Acidicts@users.noreply.github.com>"]
